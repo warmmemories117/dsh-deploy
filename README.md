@@ -1,49 +1,63 @@
 # dsh-deploy
 
-一键把 **DeepSeek Harness** 部署到 [Render](https://render.com)（免费层即可）。
+把 **DeepSeek Harness** 跑在云上，iPad 关掉也不影响。
 
-## 这是什么
+目前支持两种方式：
 
-一个极简 Docker 镜像：装 npm 上的预编译包 `@deepseek-ai/dsh`，直接起 Web 服务。
-**不构建源码**（源码要 node≥24.9 + pnpm 完整构建，又慢又容易失败）。
+| 方式 | 费用 | 需要绑卡 | 常驻 |
+|---|---|---|---|
+| **A. GitHub Codespaces**（推荐先试） | 每月免费 60 小时 | ❌ 不需要 | 30 分钟空闲会停 |
+| **B. Render**（免费层） | $0 | ✅ 要验卡（$1 预授权） | 15 分钟空闲会休眠 |
 
-## 部署步骤（约 5 分钟）
+---
 
-1. 打开 https://dashboard.render.com/ → **New** → **Web Service**
-2. 选 **Build and deploy from a Git repository** → 连接 GitHub → 选本仓库 `dsh-deploy`
-3. 配置：
-   - **Name**：`deepseek-harness`（决定域名，可自定）
-   - **Region**：`Singapore`（离国内最近）
-   - **Language**：**Docker**
-   - **Instance Type**：**Free**
-   - 其余留空
-4. 点 **Create Web Service**，等 2~4 分钟构建
-5. 打开 **Logs**，找这一行：
+## A. 用 Codespaces 跑（不用卡）
+
+1. 打开 https://github.com/warmmemories117/dsh-deploy
+2. 点绿色 **`Code`** → 切到 **`Codespaces`** 标签 → **`Create codespace on main`**
+3. 等 1–2 分钟（会自动装好 dsh）
+4. 终端里会自动启动服务，滚动到下面找这一行：
 
    ```
-   dsh web: https://<你的域名>.onrender.com/?token=xxxxxxxx
+   dsh web: https://<随机名>-8080.app.github.dev/?token=xxxxx
    ```
 
-   **把这个网址收藏**——它就是入口（带 token 才能进）。
+   **这个网址就是入口**，任何设备打开都能用。
 
-## 注意
+### 常用操作
 
-- **免费层会休眠**：15 分钟没人访问就睡，下次打开要等约 50 秒冷启动
-- **文件不持久**：免费层没有持久磁盘，容器重启后 `DSH_HOME` 里的会话会丢
-- **token 会变**：实例重建后 token 会重新生成，届时去 Logs 里重新抄
-- 想要常驻 + 持久化：升到 Starter（$7/月）并挂一块 Disk 到 `/data`
+| 想做什么 | 怎么做 |
+|---|---|
+| 服务停了重新起 | 终端里跑 `dsh --profile web --no-open --host 127.0.0.1 --port 8080` |
+| 端口没公开 | 底部 **PORTS** 面板 → 找到 8080 → 右键 → **Port Visibility → Public** |
+| 停止 Codespace | 左下角 **Codespaces** → 选自己的 → **Stop codespace**（不占时间） |
+| 找回网址 | 重新打开 codespace，跑一次启动命令即可 |
 
-## 本地跑（可选）
+> 免费额度：个人账号每月 **120 core-hours**（2 核 = 60 小时）。用完前会邮件提醒。
+
+---
+
+## B. 用 Render 部署
+
+1. https://dashboard.render.com/ → **New** → **Web Service**
+2. 选 **Public Git repository**，填 `https://github.com/warmmemories117/dsh-deploy`
+3. Name 随意，Region **Singapore**，Language **Docker**，Instance **Free**
+4. 需要绑卡验证（$1 临时授权，不扣费）→ **Deploy web service**
+5. 在 **Logs** 里找 `dsh web: https://...?token=...`
+
+---
+
+## 本地 Docker
 
 ```bash
 docker build -t dsh .
 docker run -p 8080:8080 -v dsh-data:/data dsh
-# 打开日志里打印的 http://localhost:8080/?token=...
 ```
 
 ## 已知坑
 
-- `dsh web` **拒绝绑定 `0.0.0.0`**（会报 wildcard address not supported，防止把 RCE 暴露到网络）。
-  `entrypoint.sh` 因此先用 node 探测容器的第一块非回环 IPv4，再绑定那个地址。
-- 反向代理必须把 `Host` 传进来，否则信任校验会拒；`entrypoint.sh` 已用 `RENDER_EXTERNAL_URL`
-  自动补上 `--public-url` 与 `--trusted-host`。
+- `dsh web` **拒绝绑定 `0.0.0.0`**（报 wildcard address not supported，防止把 RCE 暴露到网络）。
+  `entrypoint.sh` 会按环境自动选择监听地址：Codespaces 用 `127.0.0.1`，容器用第一块网卡 IP。
+- 反向代理需要正确的 `Host`，否则信任校验会拒；脚本用 `RENDER_EXTERNAL_URL` / `CODESPACE_NAME`
+  自动补 `--public-url` 与 `--trusted-host`。
+- 源码构建（`pnpm build`）需要 node ≥ 24.9，本项目**不构建源码**，只装 npm 预编译包。
