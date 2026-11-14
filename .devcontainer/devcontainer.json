@@ -1,17 +1,14 @@
 {
   "name": "DeepSeek Harness",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
-  "postCreateCommand": "npm install -g @deepseek-ai/dsh@latest && echo '✅ dsh 已安装'",
-  "postAttachCommand": "bash -lc 'if ! curl -s -o /dev/null http://127.0.0.1:8080/; then nohup dsh --profile web --no-open --host 127.0.0.1 --port 8080 > /tmp/dsh.log 2>&1 & sleep 6; fi; cat /tmp/dsh.log | tail -20'",
+  "postCreateCommand": "npm install -g @deepseek-ai/dsh@latest && npm install -g pnpm && echo '✅ dsh 已安装'",
+  "postAttachCommand": "bash -lc 'export DSH_HOME=\"$HOME/.dsh\"; if ! curl -s -o /dev/null --max-time 3 http://127.0.0.1:8080/; then cd ~/.dsh/profiles/web 2>/dev/null && pnpm install --silent >/dev/null 2>&1; cd /workspaces/dsh-deploy && nohup env DSH_HOME=\"$HOME/.dsh\" PORT=8080 bash entrypoint.sh > /tmp/run.log 2>&1 & sleep 12; fi; tail -6 /tmp/run.log 2>/dev/null'",
   "forwardPorts": [8080],
   "portsAttributes": {
     "8080": {
       "label": "DeepSeek Harness",
       "visibility": "public",
-      "onAutoForward": "openPreview"
+      "onAutoForward": "silent"
     }
-  },
-  "remoteEnv": {
-    "DSH_HOME": "${containerWorkspaceFolder}/.dsh"
   }
 }
